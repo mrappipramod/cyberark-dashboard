@@ -4,84 +4,79 @@ from utils.cyberark_client import CyberArkClient
 
 st.set_page_config(page_title="CyberArk Dashboard", page_icon="🔐", layout="wide")
 
-# Initialize CyberArk Client in state
+# Persistent state mapping across Streamlit refresh iterations
 if 'client' not in st.session_state:
     st.session_state.client = CyberArkClient()
 
 st.sidebar.title("🔐 CyberArk Dashboard")
 page = st.sidebar.radio("Navigate", ["Dashboard Overview", "Account Management", "Safe Explorer"])
 
-# Sidebar Connection Test
 if st.sidebar.button("Test Connection"):
-    with st.spinner("Connecting to CyberArk..."):
+    with st.spinner("Connecting to Vault..."):
         if st.session_state.client.authenticate():
-            st.sidebar.success("✅ Connected Successfully!")
+            st.sidebar.success("✅ Connected")
         else:
-            st.sidebar.error("❌ Connection Failed. Check your Secrets configuration.")
+            st.sidebar.error("❌ Connection Failed")
 
 # ---------- Dashboard Overview ----------
 if page == "Dashboard Overview":
     st.title("📊 CyberArk Dashboard Overview")
-    st.info("💡 Use the sidebar to test your credentials, then navigate to Account Management or Safe Explorer.")
-    
-    # Quick status indicator
-    if st.session_state.client.token:
-        st.success("Session Status: Authenticated")
-    else:
-        st.warning("Session Status: Disconnected (Will auto-connect when data is requested)")
+    st.info("Use the sidebar navigation choices to explore Active Directory Records, Safe configurations, and Asset distribution.")
 
 # ---------- Account Management ----------
 elif page == "Account Management":
     st.title("👤 Account Management")
-    
     col1, col2 = st.columns(2)
     with col1:
-        safe_filter = st.text_input("Filter by Safe Name (Optional)", placeholder="e.g. MY-SAFE-01")
+        safe_filter = st.text_input("Filter by Safe (optional)", placeholder="e.g. PVWAReports")
     with col2:
-        limit = st.number_input("Max Results", min_value=10, max_value=500, value=50, step=10)
+        limit = st.number_input("Max results", min_value=10, max_value=500, value=50, step=10)
 
     if st.button("Fetch Accounts", type="primary"):
-        with st.spinner("Querying CyberArk Accounts Vault..."):
+        with st.spinner("Loading accounts from CyberArk..."):
             accounts = st.session_state.client.get_accounts(
                 safe=safe_filter.strip() if safe_filter else None,
                 limit=limit
             )
-            
             if accounts and len(accounts) > 0:
-                df = pd.DataFrame(accounts)
+                # json_normalize flattens nested dictionaries automatically
+                df = pd.json_normalize(accounts)
                 
-                # Flexible matching to capture dynamic CyberArk field variations
-                potential_cols = ['id', 'name', 'userName', 'username', 'address', 'safeName', 'safe', 'platformId', 'secretType']
+                # Dynamic matching accommodates both standard and flat-mapped column keys
+                potential_cols = [
+                    'id', 'name', 'userName', 'username', 'address', 
+                    'safeName', 'platformId', 'secretType', 'creator.name'
+                ]
                 display_cols = [c for c in potential_cols if c in df.columns]
                 
-                # If filtering cleaned up too many columns, fallback to showing all available data
                 if not display_cols:
                     display_cols = list(df.columns)
-                
-                st.success(f"🎉 Successfully found {len(accounts)} accounts")
+                    
+                st.success(f"Found {len(accounts)} accounts")
                 st.dataframe(df[display_cols], use_container_width=True)
             else:
-                st.warning("No accounts found. Toggle open the 'Debug: Raw API Response' tool at the bottom of the page to inspect.")
+                st.warning("No accounts parsed. Check the debug expander below for details.")
 
 # ---------- Safe Explorer ----------
 elif page == "Safe Explorer":
     st.title("📁 Safe Explorer")
-    
-    if st.button("Load All Safes", type="primary"):
-        with st.spinner("Querying CyberArk Safes Inventory..."):
+    if st.button("Load Safes", type="primary"):
+        with st.spinner("Loading safes inventory..."):
             safes = st.session_state.client.get_safes()
-            
             if safes and len(safes) > 0:
-                df = pd.DataFrame(safes)
+                # Flatten schema objects to expose 'creator.name' cleanly in table columns
+                df = pd.json_normalize(safes)
                 
-                # Flexible column matching for Safe schemas
-                potential_safe_cols = ['safeName', 'name', 'safeUrlId', 'description', 'managingCPM', 'numberOfDaysRetention', 'location']
+                potential_safe_cols = [
+                    'safeNumber', 'safeName', 'description', 
+                    'managingCPM', 'numberOfDaysRetention', 'creator.name', 'location'
+                ]
                 display_cols = [c for c in potential_safe_cols if c in df.columns]
                 
                 if not display_cols:
                     display_cols = list(df.columns)
-                
-                st.success(f"🎉 Successfully found {len(safes)} safes")
+                    
+                st.success(f"Found {len(safes)} safes")
                 st.dataframe(df[display_cols], use_container_width=True)
             else:
-                st.warning("No safes found. Check permissions or inspect the raw expander logs.")
+                st.warning("No safes parsed. Review permissions or check the debug engine logs.")
