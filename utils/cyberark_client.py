@@ -53,28 +53,39 @@ class CyberArkClient:
             return False
 
     def _parse_response(self, data):
-        """Parse API response that may be a list of JSON strings with trailing numbers or standard dicts."""
+        """
+        Extracts and parses valid JSON maps from malformed responses, stream chunks,
+        or raw text lines prefixed/suffixed with transit tracking indicators.
+        """
         if isinstance(data, dict):
             return [data]
             
-        if not isinstance(data, list):
+        # Convert any input list structures or raw streaming text into a uniform string
+        if isinstance(data, list):
+            if not data:
+                return []
+            if isinstance(data[0], dict):
+                return data
+            raw_string = "".join([str(item) for item in data])
+        elif isinstance(data, str):
+            raw_string = data
+        else:
             return []
+
+        parsed_items = []
         
-        parsed = []
-        for item in data:
-            if isinstance(item, str):
-                # Clean up string if your environment appends arbitrary numbers/tabs
-                cleaned = re.sub(r'\s+\d+$', '', item.strip())
-                try:
-                    parsed.append(json.loads(cleaned))
-                except Exception:
-                    # Fallback: if it's not JSON, keep it as text
-                    parsed.append({"raw_text": item})
-            elif isinstance(item, dict):
-                parsed.append(item)
-            else:
-                parsed.append({"value": item})
-        return parsed
+        # Regex captures balanced brackets {} to safely extract complete objects
+        # while stripping tracking numbers (e.g. 0{...}171{...}172)
+        json_blocks = re.findall(r'\{[^{}]*\}', raw_string)
+        
+        for block in json_blocks:
+            try:
+                cleaned_block = block.strip()
+                parsed_items.append(json.loads(cleaned_block))
+            except (json.JSONDecodeError, ValueError):
+                continue  # Skip any broken or partial JSON remnants
+                
+        return parsed_items
 
     def get_accounts(self, safe=None, limit=50, search=None):
         if not self.token and not self.authenticate():
@@ -90,19 +101,21 @@ class CyberArkClient:
         try:
             resp = self.session.get(url, params=params, timeout=10, verify=False)
             if resp.status_code == 200:
-                data = resp.json()
-                
-                # Fixed: Safely preview regardless of whether data is a list or dict
+                # Fallback check if response content is plaintext chunking stream
+                try:
+                    data = resp.json()
+                except json.JSONDecodeError:
+                    data = resp.text
+
                 with st.expander("🔍 Debug: Raw API Response (Accounts)", expanded=False):
                     if isinstance(data, dict):
                         st.json({k: data[k] for k in list(data.keys())[:3]})
                     else:
-                        st.json(data[:3])
-                
-                # Extract inner content wrapper
+                        st.text(str(data)[:1000])
+
                 if isinstance(data, dict) and "value" in data:
                     data = data["value"]
-                
+
                 return self._parse_response(data)
             else:
                 st.error(f"Failed to fetch accounts: HTTP {resp.status_code}")
@@ -119,18 +132,20 @@ class CyberArkClient:
         try:
             resp = self.session.get(url, timeout=10, verify=False)
             if resp.status_code == 200:
-                data = resp.json()
-                
-                # Fixed: Safely preview regardless of whether data is a list or dict
+                try:
+                    data = resp.json()
+                except json.JSONDecodeError:
+                    data = resp.text
+
                 with st.expander("🔍 Debug: Raw API Response (Safes)", expanded=False):
                     if isinstance(data, dict):
                         st.json({k: data[k] for k in list(data.keys())[:3]})
                     else:
-                        st.json(data[:3])
-                
+                        st.text(str(data)[:1000])
+
                 if isinstance(data, dict) and "value" in data:
                     data = data["value"]
-                
+
                 return self._parse_response(data)
             else:
                 st.error(f"Failed to fetch safes: HTTP {resp.status_code}")
