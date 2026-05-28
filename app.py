@@ -20,7 +20,7 @@ if st.sidebar.button("Test Connection"):
 # ---------- Dashboard Overview ----------
 if page == "Dashboard Overview":
     st.title("📊 CyberArk Dashboard Overview")
-    st.info("Use the sidebar to test connection, then navigate to Account Management or Safe Explorer.")
+    st.info("Use sidebar to test connection, then navigate to Account Management or Safe Explorer.")
 
 # ---------- Account Management ----------
 elif page == "Account Management":
@@ -46,7 +46,7 @@ elif page == "Account Management":
                 st.dataframe(df[display_cols], width='stretch')
                 st.success(f"Found {len(accounts)} accounts")
             else:
-                st.warning("No accounts found or connection failed. Check the debug expander for raw API response.")
+                st.warning("No accounts found. Check the debug expander for raw API response.")
 
 # ---------- Safe Explorer ----------
 elif page == "Safe Explorer":
@@ -56,7 +56,10 @@ elif page == "Safe Explorer":
             safes = st.session_state.client.get_safes()
             if safes and len(safes) > 0:
                 df = pd.DataFrame(safes)
-                st.dataframe(df, width='stretch')
+                # Show relevant columns
+                display_cols = ['safeName', 'description', 'managingCPM', 'numberOfDaysRetention']
+                display_cols = [c for c in display_cols if c in df.columns]
+                st.dataframe(df[display_cols], width='stretch')
                 st.success(f"Found {len(safes)} safes")
             else:
                 st.warning("No safes found. Check debug expander.")
