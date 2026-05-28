@@ -39,13 +39,14 @@ elif page == "Account Management":
             )
             if accounts and len(accounts) > 0:
                 df = pd.DataFrame(accounts)
-                # Select common columns (rename if needed)
+                # Select common columns
                 display_cols = ['name', 'userName', 'address', 'safeName', 'platformId', 'secretType', 'id']
                 display_cols = [c for c in display_cols if c in df.columns]
-                st.dataframe(df[display_cols], use_container_width=True)
+                # Replace deprecated use_container_width with width='stretch'
+                st.dataframe(df[display_cols], width='stretch')
                 st.success(f"Found {len(accounts)} accounts")
             else:
-                st.warning("No accounts found or connection failed")
+                st.warning("No accounts found or connection failed. Check the debug expander for raw API response.")
 
 # ---------- Safe Explorer ----------
 elif page == "Safe Explorer":
@@ -55,7 +56,7 @@ elif page == "Safe Explorer":
             safes = st.session_state.client.get_safes()
             if safes and len(safes) > 0:
                 df = pd.DataFrame(safes)
-                st.dataframe(df, use_container_width=True)
+                st.dataframe(df, width='stretch')
                 st.success(f"Found {len(safes)} safes")
             else:
-                st.warning("No safes found")
+                st.warning("No safes found. Check debug expander.")
