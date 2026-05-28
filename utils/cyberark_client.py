@@ -24,7 +24,6 @@ class CyberArkClient:
                 timeout=10
             )
             if response.status_code == 200:
-                # Handle variations in token response format
                 data = response.json() if hasattr(response, "json") else response.text
                 if isinstance(data, dict):
                     self.token = data.get("CyberArkToken") or data.get("token") or data.get("access_token")
@@ -51,7 +50,6 @@ class CyberArkClient:
         if not self.token and not self.authenticate():
             return None, "Authentication failure"
 
-        # Standardize endpoint path structure
         clean_endpoint = endpoint.lstrip('/')
         full_url = f"{self.url}/{clean_endpoint}"
         
@@ -77,9 +75,30 @@ class CyberArkClient:
         except Exception as e:
             return None, str(e)
 
-    # Maintain your original explicit hooks for safety 
+    # --- 🔄 BACKWARDS COMPATIBILITY LAYER ---
+    
+    def get_accounts(self, *args, **kwargs):
+        """
+        Restores the missing account retrieval hook.
+        Intercepts safe, search, or limit variables to protect legacy dashboard pages.
+        """
+        params = {}
+        if "limit" in kwargs:
+            params["limit"] = kwargs["limit"]
+        if "search" in kwargs:
+            params["search"] = kwargs["search"]
+        if "safe" in kwargs:
+            # Maps standard safe queries to official CyberArk filter semantics
+            params["filter"] = f"safeName eq {kwargs['safe']}"
+            
+        data, err = self.generic_request("GET", "PasswordVault/api/accounts", params=params)
+        if data:
+            return data.get("value", []) if isinstance(data, dict) else data
+        return []
+
     def get_safes(self):
+        """Restores explicit safe discovery listing hook used across modules."""
         data, err = self.generic_request("GET", "PasswordVault/api/Safes")
         if data:
-            return data.get("value", data) if isinstance(data, dict) else data
+            return data.get("value", []) if isinstance(data, dict) else data
         return []
