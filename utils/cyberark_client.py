@@ -24,7 +24,7 @@ class CyberArkClient:
                 auth_url,
                 json={"username": self.username, "password": self.password},
                 verify=False,          # For self‑signed certificates
-                timeout=10             # Critical to avoid infinite loop
+                timeout=10
             )
 
             if response.status_code == 200:
@@ -68,7 +68,7 @@ class CyberArkClient:
             return False
 
     def get_accounts(self, safe=None, limit=50, search=None):
-        """Retrieve accounts from CyberArk"""
+        """Retrieve accounts from CyberArk and parse them into a clean list of dicts."""
         if not self.token and not self.authenticate():
             return []
 
@@ -82,7 +82,22 @@ class CyberArkClient:
         try:
             resp = self.session.get(url, params=params, timeout=10, verify=False)
             if resp.status_code == 200:
-                return resp.json()
+                data = resp.json()
+                
+                # If data is a list of strings that look like JSON (e.g., with trailing "\t12")
+                if isinstance(data, list) and data and isinstance(data[0], str):
+                    parsed = []
+                    for item in data:
+                        try:
+                            # Remove trailing tab and number if present (e.g., '..."\t12')
+                            cleaned = item.split('\t')[0] if '\t' in item else item
+                            parsed.append(json.loads(cleaned))
+                        except:
+                            parsed.append(item)
+                    return parsed
+                
+                # Normal case: list of dicts
+                return data
             else:
                 st.error(f"Failed to fetch accounts: HTTP {resp.status_code}")
                 return []
