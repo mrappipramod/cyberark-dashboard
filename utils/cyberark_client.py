@@ -53,25 +53,27 @@ class CyberArkClient:
             return False
 
     def _parse_response(self, data):
-        """Parse API response that may be a list of JSON strings with trailing numbers."""
+        """Parse API response that may be a list of JSON strings with trailing numbers or standard dicts."""
+        if isinstance(data, dict):
+            return [data]
+            
         if not isinstance(data, list):
-            return data if isinstance(data, dict) else []
+            return []
         
         parsed = []
         for item in data:
             if isinstance(item, str):
-                # Clean the string: remove trailing tab and number (e.g., '\t17' or ' 17')
-                # Also remove any trailing whitespace
+                # Clean up string if your environment appends arbitrary numbers/tabs
                 cleaned = re.sub(r'\s+\d+$', '', item.strip())
                 try:
                     parsed.append(json.loads(cleaned))
-                except:
-                    # If still not JSON, keep as is
-                    parsed.append(item)
+                except Exception:
+                    # Fallback: if it's not JSON, keep it as text
+                    parsed.append({"raw_text": item})
             elif isinstance(item, dict):
                 parsed.append(item)
             else:
-                parsed.append(item)
+                parsed.append({"value": item})
         return parsed
 
     def get_accounts(self, safe=None, limit=50, search=None):
@@ -90,17 +92,18 @@ class CyberArkClient:
             if resp.status_code == 200:
                 data = resp.json()
                 
-                # Debug: show raw response (collapsible)
+                # Fixed: Safely preview regardless of whether data is a list or dict
                 with st.expander("🔍 Debug: Raw API Response (Accounts)", expanded=False):
-                    st.write(data[:3] if len(data) > 3 else data)  # show first few items
+                    if isinstance(data, dict):
+                        st.json({k: data[k] for k in list(data.keys())[:3]})
+                    else:
+                        st.json(data[:3])
                 
-                # Extract from {"value": [...]} if present
+                # Extract inner content wrapper
                 if isinstance(data, dict) and "value" in data:
                     data = data["value"]
                 
-                # Parse the list (strings with trailing numbers)
-                parsed = self._parse_response(data)
-                return parsed
+                return self._parse_response(data)
             else:
                 st.error(f"Failed to fetch accounts: HTTP {resp.status_code}")
                 return []
@@ -118,14 +121,17 @@ class CyberArkClient:
             if resp.status_code == 200:
                 data = resp.json()
                 
+                # Fixed: Safely preview regardless of whether data is a list or dict
                 with st.expander("🔍 Debug: Raw API Response (Safes)", expanded=False):
-                    st.write(data[:3] if len(data) > 3 else data)
+                    if isinstance(data, dict):
+                        st.json({k: data[k] for k in list(data.keys())[:3]})
+                    else:
+                        st.json(data[:3])
                 
                 if isinstance(data, dict) and "value" in data:
                     data = data["value"]
                 
-                parsed = self._parse_response(data)
-                return parsed
+                return self._parse_response(data)
             else:
                 st.error(f"Failed to fetch safes: HTTP {resp.status_code}")
                 return []
