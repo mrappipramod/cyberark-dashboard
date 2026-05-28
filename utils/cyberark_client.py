@@ -77,23 +77,34 @@ class CyberArkClient:
 
     # --- 🔄 BACKWARDS COMPATIBILITY LAYER ---
     
+# --- 🔄 FIXED BACKWARDS COMPATIBILITY LAYER ---
+    
     def get_accounts(self, *args, **kwargs):
         """
-        Restores the missing account retrieval hook.
-        Intercepts safe, search, or limit variables to protect legacy dashboard pages.
+        Safely retrieves vault accounts mapping query variables to CyberArk REST specs.
         """
         params = {}
-        if "limit" in kwargs:
+        
+        # Use .get() to check for active, non-empty filter values
+        if kwargs.get("limit"):
             params["limit"] = kwargs["limit"]
-        if "search" in kwargs:
+        if kwargs.get("search"):
             params["search"] = kwargs["search"]
-        if "safe" in kwargs:
-            # Maps standard safe queries to official CyberArk filter semantics
-            params["filter"] = f"safeName eq {kwargs['safe']}"
             
-        data, err = self.generic_request("GET", "PasswordVault/api/accounts", params=params)
+        if kwargs.get("safe"):
+            # FIX: Only apply if value exists, and wrap string parameters in single quotes
+            params["filter"] = f"safeName eq '{kwargs['safe']}'"
+            
+        # Target the explicit capital 'Accounts' endpoint route
+        data, err = self.generic_request("GET", "PasswordVault/api/Accounts", params=params)
+        
         if data:
             return data.get("value", []) if isinstance(data, dict) else data
+        
+        # If the API returned an error, display a warning in the UI for context
+        if err:
+            st.error(f"Vault API rejection: {err}")
+            
         return []
 
     def get_safes(self):
