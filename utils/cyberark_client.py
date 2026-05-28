@@ -47,9 +47,6 @@ class CyberArkClient:
             else:
                 st.error(f"Auth failed (HTTP {response.status_code}): {response.text[:200]}")
                 return False
-        except requests.exceptions.Timeout:
-            st.error("❌ Connection timed out. Is your CyberArk URL reachable?")
-            return False
         except Exception as e:
             st.error(f"❌ Connection error: {str(e)}")
             return False
@@ -69,7 +66,10 @@ class CyberArkClient:
             resp = self.session.get(url, params=params, timeout=10, verify=False)
             if resp.status_code == 200:
                 data = resp.json()
-
+                # DEBUG: show raw response (collapsible)
+                with st.expander("🔍 Debug: Raw API Response", expanded=False):
+                    st.json(data)
+                
                 # --- Handle different response shapes ---
                 # Case 1: {"value": [...]}   (most common)
                 if isinstance(data, dict) and "value" in data:
@@ -85,7 +85,11 @@ class CyberArkClient:
                             parsed.append(item)
                     return parsed
                 # Case 3: normal list of dicts
-                return data if isinstance(data, list) else []
+                if isinstance(data, list):
+                    return data
+                else:
+                    st.warning(f"Unexpected response type: {type(data)}. Raw data shown in debug.")
+                    return []
             else:
                 st.error(f"Failed to fetch accounts: HTTP {resp.status_code}")
                 return []
@@ -102,6 +106,8 @@ class CyberArkClient:
             resp = self.session.get(url, timeout=10, verify=False)
             if resp.status_code == 200:
                 data = resp.json()
+                with st.expander("🔍 Debug: Raw Safes Response", expanded=False):
+                    st.json(data)
                 if isinstance(data, dict) and "value" in data:
                     data = data["value"]
                 return data if isinstance(data, list) else []
