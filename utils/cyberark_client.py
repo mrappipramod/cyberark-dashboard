@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import json
+import re
 
 class CyberArkClient:
     def __init__(self):
@@ -51,6 +52,28 @@ class CyberArkClient:
             st.error(f"❌ Connection error: {str(e)}")
             return False
 
+    def _parse_response(self, data):
+        """Parse API response that may be a list of JSON strings with trailing numbers."""
+        if not isinstance(data, list):
+            return data if isinstance(data, dict) else []
+        
+        parsed = []
+        for item in data:
+            if isinstance(item, str):
+                # Clean the string: remove trailing tab and number (e.g., '\t17' or ' 17')
+                # Also remove any trailing whitespace
+                cleaned = re.sub(r'\s+\d+$', '', item.strip())
+                try:
+                    parsed.append(json.loads(cleaned))
+                except:
+                    # If still not JSON, keep as is
+                    parsed.append(item)
+            elif isinstance(item, dict):
+                parsed.append(item)
+            else:
+                parsed.append(item)
+        return parsed
+
     def get_accounts(self, safe=None, limit=50, search=None):
         if not self.token and not self.authenticate():
             return []
@@ -66,30 +89,18 @@ class CyberArkClient:
             resp = self.session.get(url, params=params, timeout=10, verify=False)
             if resp.status_code == 200:
                 data = resp.json()
-                # DEBUG: show raw response (collapsible)
-                with st.expander("🔍 Debug: Raw API Response", expanded=False):
-                    st.json(data)
                 
-                # --- Handle different response shapes ---
-                # Case 1: {"value": [...]}   (most common)
+                # Debug: show raw response (collapsible)
+                with st.expander("🔍 Debug: Raw API Response (Accounts)", expanded=False):
+                    st.write(data[:3] if len(data) > 3 else data)  # show first few items
+                
+                # Extract from {"value": [...]} if present
                 if isinstance(data, dict) and "value" in data:
                     data = data["value"]
-                # Case 2: list of JSON strings with trailing tab (e.g., '{...}\t12')
-                if isinstance(data, list) and data and isinstance(data[0], str):
-                    parsed = []
-                    for item in data:
-                        try:
-                            cleaned = item.split('\t')[0] if '\t' in item else item
-                            parsed.append(json.loads(cleaned))
-                        except:
-                            parsed.append(item)
-                    return parsed
-                # Case 3: normal list of dicts
-                if isinstance(data, list):
-                    return data
-                else:
-                    st.warning(f"Unexpected response type: {type(data)}. Raw data shown in debug.")
-                    return []
+                
+                # Parse the list (strings with trailing numbers)
+                parsed = self._parse_response(data)
+                return parsed
             else:
                 st.error(f"Failed to fetch accounts: HTTP {resp.status_code}")
                 return []
@@ -106,11 +117,15 @@ class CyberArkClient:
             resp = self.session.get(url, timeout=10, verify=False)
             if resp.status_code == 200:
                 data = resp.json()
-                with st.expander("🔍 Debug: Raw Safes Response", expanded=False):
-                    st.json(data)
+                
+                with st.expander("🔍 Debug: Raw API Response (Safes)", expanded=False):
+                    st.write(data[:3] if len(data) > 3 else data)
+                
                 if isinstance(data, dict) and "value" in data:
                     data = data["value"]
-                return data if isinstance(data, list) else []
+                
+                parsed = self._parse_response(data)
+                return parsed
             else:
                 st.error(f"Failed to fetch safes: HTTP {resp.status_code}")
                 return []
