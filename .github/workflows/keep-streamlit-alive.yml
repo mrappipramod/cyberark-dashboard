@@ -1,31 +1,24 @@
-name: Keep Streamlit App Awake
+name: Streamlit Keep-Alive
 
 on:
   schedule:
-    - cron: '0 */6 * * *'     # Runs every 6 hours
-  workflow_dispatch:          # Allows manual run
+    # Runs every 8 hours (Streamlit sleeps after 12 hours of inactivity)
+    - cron: "0 */8 * * *"
+  workflow_dispatch: # Allows you to trigger it manually from the Actions tab
 
-# ←←← THIS IS THE IMPORTANT FIX ←←←
-permissions:
-  contents: write
+env:
+  # Silences the Node.js 20 deprecation warning
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
 
 jobs:
-  keep-alive:
+  ping:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run keep-alive Python script
-        run: python keep_alive.py
-
-      - name: Commit and push changes
+      - name: Ping Streamlit App
+        # Replace the URL below with your actual Streamlit public URL
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "GitHub Actions"
-          git add LAST_ACTIVE.txt
-          git commit -m "Keep Streamlit alive - $(date -u +'%Y-%m-%d %H:%M:%S UTC')" || echo "No changes to commit"
-          git push
+          curl -sSf https://your-app-name.streamlit.app > /dev/null
+          echo "Successfully pinged the dashboard!"
