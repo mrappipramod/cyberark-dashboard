@@ -56,7 +56,7 @@ elif page == "Privilege Cloud Portal":
             if submit_pcloud:
                 if pcloud_url and identity_url and client_id and client_secret:
                     with st.spinner("Exchanging OAuth2 Token claims with Identity directory..."):
-                        p_client = CyberArkClient()
+                        p_client = CyberArkClient(None, None, None)
                         auth_res = p_client.authenticate_pcloud(pcloud_url, identity_url, client_id, client_secret)
                         
                         if auth_res["success"]:
