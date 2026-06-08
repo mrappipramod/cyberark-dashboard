@@ -25,17 +25,71 @@ if page == "Dashboard Overview":
 # ---------- Standard Account Management ----------
 elif page == "Account Management":
     st.title("👤 Account Management (Standard Vault)")
+    
     if not st.session_state.authenticated:
-        st.warning("Please authenticate via standard login on your external main screen layout if required.")
-    # (Your existing standard account execution loop remains here...)
+        st.subheader("Login to Standard Vault")
+        with st.form("login_form"):
+            url_input = st.text_input("CyberArk PVWA URL", placeholder="https://vault.yourdomain.com")
+            user_input = st.text_input("Username")
+            pass_input = st.text_input("Password", type="password")
+            submit_button = st.form_submit_button("Connect")
+
+            if submit_button and url_input and user_input and pass_input:
+                with st.spinner("Authenticating..."):
+                    client = CyberArkClient(url_input, user_input, pass_input)
+                    if client.authenticate():
+                        st.session_state.client = client
+                        st.session_state.authenticated = True
+                        st.success("Successfully authenticated!")
+                        st.rerun()
+                    else:
+                        st.error("Authentication failed. Check your URL or credentials.")
+    else:
+        st.sidebar.success(f"✅ Vault Session: {st.session_state.client.username}")
+        if st.sidebar.button("Logout Standard Vault"):
+            st.session_state.authenticated = False
+            st.session_state.client = None
+            st.rerun()
+
+        col1, col2 = st.columns(2)
+        with col1:
+            safe_filter = st.text_input("Filter by Safe (optional)", placeholder="e.g. DOM-ADM-WIN-ACCOUNTS")
+        with col2:
+            limit = st.number_input("Max results", min_value=10, max_value=500, value=50, step=10)
+
+        if st.button("Fetch Accounts", type="primary"):
+            with st.spinner("Processing Accounts Data..."):
+                accounts = st.session_state.client.get_accounts(
+                    safe=safe_filter.strip() if safe_filter else None,
+                    limit=limit
+                )
+                if accounts:
+                    df = pd.json_normalize(accounts)
+                    potential_cols = ['id', 'name', 'userName', 'address', 'safeName', 'platformId', 'secretType']
+                    display_cols = [c for c in potential_cols if c in df.columns]
+                    st.dataframe(df[display_cols] if display_cols else df, use_container_width=True)
+                else:
+                    st.warning("No accounts found matching search parameter structures.")
 
 # ---------- Standard Safe Explorer ----------
 elif page == "Safe Explorer":
     st.title("📁 Safe Explorer (Standard Vault)")
-    # (Your existing standard safe table layout remains here...)
+    if not st.session_state.authenticated:
+        st.warning("Please log into the Standard Vault via the 'Account Management' tab first.")
+    else:
+        if st.button("Load Safes Directory", type="primary"):
+            with st.spinner("Processing Safes Inventory..."):
+                safes = st.session_state.client.get_safes()
+                if safes:
+                    df = pd.json_normalize(safes)
+                    potential_safe_cols = ['safeNumber', 'safeName', 'description', 'managingCPM', 'numberOfDaysRetention']
+                    display_cols = [c for c in potential_safe_cols if c in df.columns]
+                    st.dataframe(df[display_cols] if display_cols else df, use_container_width=True)
+                else:
+                    st.error("Unable to map raw records to target pandas frame.")
 
 # =============================================================================
-# NEW SEPARATE PAGE: Privilege Cloud Portal
+# Privilege Cloud Portal
 # =============================================================================
 elif page == "Privilege Cloud Portal":
     st.title("☁️ CyberArk Privilege Cloud Environment")
@@ -56,7 +110,8 @@ elif page == "Privilege Cloud Portal":
             if submit_pcloud:
                 if pcloud_url and identity_url and client_id and client_secret:
                     with st.spinner("Exchanging OAuth2 Token claims with Identity directory..."):
-                        p_client = CyberArkClient(None, None, None)
+                        # FIXED: This call will no longer raise a TypeError because parameters are now optional
+                        p_client = CyberArkClient() 
                         auth_res = p_client.authenticate_pcloud(pcloud_url, identity_url, client_id, client_secret)
                         
                         if auth_res["success"]:
