@@ -29,8 +29,8 @@ class CyberArkClient:
         base_pcloud = priv_cloud_url.strip("/")
         base_identity = identity_url.strip("/")
         
-        # CyberArk Identity OAuth2 Token Endpoint
-        token_url = f"{base_identity}/oauth2/token"
+   # CyberArk Identity OAuth2 Platform Token Endpoint for Privilege Cloud Shared Services
+   token_url = f"{base_identity}/oauth2/platformtoken"
         
         payload = {
             "grant_type": "client_credentials",
