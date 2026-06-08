@@ -19,7 +19,7 @@ page = st.sidebar.radio(
 
 # ---------- Core Dashboard Overview ----------
 if page == "Dashboard Overview":
-    st.title("📊 CyberArk Dashboard Overview")
+    st.title("📊 CyberArk Dashboard Overview - Login in the Account Management for PAM Selfhosted")
     st.info("Navigate through the sidebar panels to inspect system safe metrics, account schemas, and vault states.")
 
 # ---------- Standard Account Management ----------
