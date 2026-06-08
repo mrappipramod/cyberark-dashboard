@@ -61,17 +61,3 @@ def authenticate_pcloud(self, priv_cloud_url, identity_url, client_id, client_se
                 return {"success": False, "error": f"HTTP {response.status_code} - {response.text}"}
         except Exception as e:
             return {"success": False, "error": str(e)}
-
-    def get_pcloud_safe_members(self, safe_name):
-        """Fetches members and granular permissions for a given safe in PCloud."""
-        if not self.session:
-            return None
-        url = f"{self.url}/PasswordVault/api/Safes/{safe_name}/Members"
-        try:
-            response = self.session.get(url, verify=False, timeout=15)
-            if response.status_code == 200:
-                data = response.json()
-                return data.get("value") if isinstance(data, dict) and "value" in data else data
-            return None
-        except Exception:
-            return None
